@@ -7,9 +7,9 @@ function routesOverlap(a: string, b: string): boolean {
   return false
 }
 
-function routesShadow(a: string, b: string): boolean {
-  if (a === b) return true
-  return (a.endsWith('/') ? b.startsWith(a) : b.startsWith(a + '/')) || (b.endsWith('/') ? a.startsWith(b) : a.startsWith(b + '/'))
+function routesShadow(prefix: string, exact: string): boolean {
+  if (prefix === exact) return true
+  return exact.startsWith(prefix.endsWith('/') ? prefix : prefix + '/')
 }
 
 function depRangesConflict(a: string, b: string): boolean {
