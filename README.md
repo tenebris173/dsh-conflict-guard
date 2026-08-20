@@ -87,6 +87,20 @@ Example flow:
 - It does not parse every possible conflict type; it focuses on the common ones that crash DSH at install/startup.
 - The `fix` tool writes to the profile patch file; always creates a timestamped backup first.
 
+## Background & Credits / 背景与致谢
+
+This plugin was born from a real user problem:
+
+- The user installed the floating desktop pet `dsh-pet` while the family bundle's pet plugin was also active. Both registered the `/pet` route, and DSH crashed at startup with a duplicate route error.
+- The user realized plugin conflict detection is a common need, proposed the "security gate" (安检门) concept, and commissioned this development.
+- The user is not a developer. The requirement, acceptance testing, and final decisions were driven by the user; the implementation was done by an AI assistant.
+
+这个插件来自一个真实用户问题：
+
+- 用户安装了浮动桌宠 `dsh-pet`，与全家桶自带宠物同时注册 `/pet` 路由，导致 DSH 启动崩溃。
+- 用户意识到“插件冲突检测”是普遍需求，提出了“安检门”概念并委托开发。
+- 用户本人不会开发；需求提出、验收和最终把关由用户完成，代码实现由 AI 助手完成。
+
 ## License / 许可
 
 BSD-3-Clause
