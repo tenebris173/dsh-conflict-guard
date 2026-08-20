@@ -185,8 +185,9 @@ export function auditProfileStructure(profileDir: string): StructureIssue[] {
     const entries = parsePatchEntries(text, bundle)
     const seen = new Map<string, number>()
     for (const e of entries) {
-      if (!e.id) issues.push({ severity: 'error', message: `bundle "${bundle}" has an insert entry without id` })
-      else {
+      if (!e.id) {
+        issues.push({ severity: 'error', message: `bundle "${bundle}" has an insert entry without id` })
+      } else {
         const count = (seen.get(e.id) || 0) + 1
         seen.set(e.id, count)
         if (count > 1) issues.push({ severity: 'error', message: `bundle "${bundle}" has duplicate id "${e.id}"` })

@@ -90,13 +90,12 @@ export function disablePlugin(profileDir: string, id: string): DisableResult {
 
   const original = readFileSync(file, 'utf8')
   const lines = original.split(/\r?\n/)
-  const idRe = new RegExp(`^-\\s*id:\\s*['"]?${escapeRegExp(id)}['"]?\\s*(?:#.*)?$`, 'm')
-  const match = idRe.exec(original)
+  const startLine = findIdLine(lines, id)
 
   let next: string
-  if (match) {
-    const startLine = original.slice(0, match.index).split(/\r?\n/).length - 1
-    const blockEnd = findBlockEnd(lines, startLine)
+  if (startLine !== -1) {
+    const nested = /^\s/.test(lines[startLine])
+    const blockEnd = findBlockEnd(lines, startLine, nested)
     const blockLines = lines.slice(startLine, blockEnd)
     const blockText = blockLines.join('\n')
 
@@ -105,6 +104,7 @@ export function disablePlugin(profileDir: string, id: string): DisableResult {
     }
 
     const insertAt = startLine + 1
+    const idIndent = (lines[startLine].match(/^\s*/) || [''])[0]
     if (/disabled:\s*false/.test(blockText)) {
       next = lines.map((ln, idx) => {
         if (idx >= startLine && idx < blockEnd && /disabled:\s*false/.test(ln)) {
@@ -114,7 +114,7 @@ export function disablePlugin(profileDir: string, id: string): DisableResult {
       }).join('\n')
     } else {
       const updated = [...lines]
-      updated.splice(insertAt, 0, '  disabled: true')
+      updated.splice(insertAt, 0, `${idIndent}  disabled: true`)
       next = updated.join('\n')
     }
   } else {
@@ -128,11 +128,38 @@ export function disablePlugin(profileDir: string, id: string): DisableResult {
   return { ok: true, file, backup, message: `disabled ${id} in ${file}` }
 }
 
-function findBlockEnd(lines: string[], start: number): number {
+/** Locate the `- id: <target>` line, top-level first, then nested (indented). */
+function findIdLine(lines: string[], id: string): number {
+  const top = new RegExp(`^-\\s*id:\\s*['"]?${escapeRegExp(id)}['"]?\\s*(?:#.*)?$`)
+  for (let i = 0; i < lines.length; i++) {
+    if (top.test(lines[i])) return i
+  }
+  const nested = new RegExp(`^\\s+-\\s*id:\\s*['"]?${escapeRegExp(id)}['"]?\\s*(?:#.*)?$`)
+  for (let i = 0; i < lines.length; i++) {
+    if (nested.test(lines[i])) return i
+  }
+  return -1
+}
+
+function findBlockEnd(lines: string[], start: number, nested: boolean): number {
   let i = start + 1
-  while (i < lines.length) {
-    if (/^-\s/.test(lines[i])) break
-    i++
+  if (nested) {
+    const indent = (lines[start].match(/^\s*/) || [''])[0]
+    while (i < lines.length) {
+      const line = lines[i]
+      if (line.trim() === '') {
+        i++
+        continue
+      }
+      const curIndent = (line.match(/^\s*/) || [''])[0]
+      if (curIndent.length <= indent.length) break
+      i++
+    }
+  } else {
+    while (i < lines.length) {
+      if (/^-\s/.test(lines[i])) break
+      i++
+    }
   }
   return i
 }
