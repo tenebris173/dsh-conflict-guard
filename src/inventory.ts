@@ -40,6 +40,18 @@ export function resolvePackageDir(profileDir: string, packageName: string): stri
   return undefined
 }
 
+function resolveEntryPackageDir(profileDir: string, name?: string): string | undefined {
+  if (!name || name.startsWith('.') || name.startsWith('/') || name.startsWith('file:')) return undefined
+  let base = name
+  const scoped = name.match(/^(@[^/]+\/[^/]+)(?:\/.*)?$/)
+  if (scoped) base = scoped[1]
+  else {
+    const plain = name.match(/^([^/]+)(?:\/.*)?$/)
+    if (plain) base = plain[1]
+  }
+  return resolvePackageDir(profileDir, base)
+}
+
 /**
  * Build the effective plugin roster for a profile:
  * bundle patches in order + the profile's own cordis.patch.yml.
@@ -120,8 +132,11 @@ export function loadActiveEntries(profileDir: string): PluginEntry[] {
   const entries = [...map.values()]
   for (const entry of entries) {
     if (entry.disabled) continue
-    if (entry.packageDir && existsSync(entry.packageDir)) {
-      const scan = scanPackage(entry.packageDir)
+    const moduleDir = resolveEntryPackageDir(profileDir, entry.name)
+    const scanDir = moduleDir || (entry.packageDir && existsSync(entry.packageDir) ? entry.packageDir : undefined)
+    if (scanDir) {
+      const scan = scanPackage(scanDir)
+      entry.packageDir = scanDir
       entry.prefixes = scan.prefixes
       entry.exact = scan.exact
       entry.services = scan.services

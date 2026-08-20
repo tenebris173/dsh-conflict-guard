@@ -103,6 +103,8 @@ export function findExistingConflicts(entries: PluginEntry[]): Conflict[] {
     for (let j = i + 1; j < active.length; j++) {
       const a = active[i]
       const b = active[j]
+      // Same bundle package: internal entries are not cross-plugin conflicts.
+      if (a.packageName === b.packageName) continue
 
       if (a.id === b.id) {
         conflicts.push({
@@ -160,18 +162,6 @@ export function findExistingConflicts(entries: PluginEntry[]): Conflict[] {
             existingId: b.id,
           })
         }
-      }
-
-      if (a.packageName === b.packageName && a.packageDir && b.packageDir && a.packageDir !== b.packageDir) {
-        conflicts.push({
-          kind: 'package-name',
-          severity: 'warning',
-          candidate: a.packageName,
-          existing: `${b.id} (${b.packageName})`,
-          detail: `Package "${a.packageName}" is installed in multiple locations`,
-          candidateId: a.id,
-          existingId: b.id,
-        })
       }
     }
   }
