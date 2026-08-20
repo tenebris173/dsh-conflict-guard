@@ -42,7 +42,7 @@ function readJson(file: string): any {
  * It first looks for `kind: prefix|exact` + `path:` registration blocks,
  * then falls back to conservative route-looking literals.
  */
-export function extractRoutesFromFile(file: string): { prefixes: string[]; exact: string[] } {
+export function extractRoutesFromFile(file: string): { prefixes: string[]; exact: string[]; dynamicRoutes: string[] } {
   const src = readFileSync(file, 'utf8')
   // Drop pure comment lines so route-like text in comments is not treated as code.
   const code = src.split(/\r?\n/).filter((line) => {
@@ -51,6 +51,7 @@ export function extractRoutesFromFile(file: string): { prefixes: string[]; exact
   }).join('\n')
   const prefixes = new Set<string>()
   const exact = new Set<string>()
+  const dynamicRoutes = new Set<string>()
 
   // Build constant route assignments (e.g. `const ROUTE_PREFIX = '/pet'`).
   const assignments = new Map<string, string>()
@@ -74,6 +75,7 @@ export function extractRoutesFromFile(file: string): { prefixes: string[]; exact
     if (path.startsWith("'") || path.startsWith('"') || path.startsWith('`')) {
       path = path.slice(1, -1)
     } else {
+      if (!assignments.has(raw)) dynamicRoutes.add(raw)
       path = assignments.get(raw) ?? ''
     }
     if (!path.startsWith('/')) continue
@@ -90,6 +92,7 @@ export function extractRoutesFromFile(file: string): { prefixes: string[]; exact
   return {
     prefixes: [...prefixes].sort(),
     exact: [...exact].sort(),
+    dynamicRoutes: [...dynamicRoutes].sort(),
   }
 }
 
@@ -143,6 +146,51 @@ export function extractServicesFromFile(file: string): string[] {
   return [...services].sort()
 }
 
+function collectSlotRegisterBlocks(code: string): string[] {
+  const blocks: string[] = []
+  const re = /slots\.register\s*\(\s*\{/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(code)) !== null) {
+    const start = m.index + m[0].length - 1
+    let depth = 1
+    let i = start + 1
+    let quote: string | null = null
+    let escaped = false
+    while (i < code.length && depth > 0) {
+      const ch = code[i]
+      if (quote) {
+        if (escaped) escaped = false
+        else if (ch === '\\') escaped = true
+        else if (ch === quote) quote = null
+      } else if (ch === '"' || ch === "'" || ch === '`') {
+        quote = ch
+      } else if (ch === '{') {
+        depth += 1
+      } else if (ch === '}') {
+        depth -= 1
+      }
+      i += 1
+    }
+    blocks.push(code.slice(start, i))
+  }
+  return blocks
+}
+
+export function extractSlotsFromFile(file: string): string[] {
+  const src = readFileSync(file, 'utf8')
+  const code = src.split(/\r?\n/).filter((line) => {
+    const t = line.trim()
+    return !(t.startsWith('//') || t.startsWith('/*') || t.startsWith('*'))
+  }).join('\n')
+  const slots = new Set<string>()
+  for (const block of collectSlotRegisterBlocks(code)) {
+    const name = block.match(/name:\s*['"]([^'"]+)['"]/)?.[1]
+    const id = block.match(/id:\s*['"]([^'"]+)['"]/)?.[1]
+    if (name) slots.add(id ? `${name}#${id}` : name)
+  }
+  return [...slots].sort()
+}
+
 /** Scan a plugin package directory for route declarations and patch ids. */
 export function scanPackage(packageDir: string): RouteScan {
   const pkgJsonPath = join(packageDir, 'package.json')
@@ -152,6 +200,8 @@ export function scanPackage(packageDir: string): RouteScan {
   const prefixes = new Set<string>()
   const exact = new Set<string>()
   const services = new Set<string>()
+  const slots = new Set<string>()
+  const dynamicRoutes = new Set<string>()
   const files: string[] = []
   for (const sub of ['lib', 'src']) {
     const dir = join(packageDir, sub)
@@ -165,7 +215,15 @@ export function scanPackage(packageDir: string): RouteScan {
     const r = extractRoutesFromFile(file)
     for (const p of r.prefixes) prefixes.add(p)
     for (const p of r.exact) exact.add(p)
+    for (const d of r.dynamicRoutes || []) dynamicRoutes.add(d)
     for (const s of extractServicesFromFile(file)) services.add(s)
+    for (const s of extractSlotsFromFile(file)) slots.add(s)
+  }
+
+  const deps: Record<string, string> = {}
+  const section = pkg?.peerDependencies
+  if (section && typeof section === 'object') {
+    for (const [name, range] of Object.entries(section)) deps[name] = String(range)
   }
 
   const ids = new Set<string>()
@@ -188,5 +246,8 @@ export function scanPackage(packageDir: string): RouteScan {
     exact: [...exact].sort(),
     ids: [...ids].sort(),
     services: [...services].sort(),
+    slots: [...slots].sort(),
+    dynamicRoutes: [...dynamicRoutes].sort(),
+    deps,
   }
 }

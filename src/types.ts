@@ -7,6 +7,9 @@ export interface PluginEntry {
   prefixes: string[]
   exact: string[]
   services: string[]
+  slots: string[]
+  dynamicRoutes: string[]
+  deps: Record<string, string>
 }
 
 export interface RouteScan {
@@ -16,10 +19,13 @@ export interface RouteScan {
   exact: string[]
   ids: string[]
   services: string[]
+  slots: string[]
+  dynamicRoutes: string[]
+  deps: Record<string, string>
 }
 
 export interface Conflict {
-  kind: 'route-prefix' | 'route-exact' | 'plugin-id' | 'package-name' | 'service'
+  kind: 'route-prefix' | 'route-exact' | 'route-shadow' | 'plugin-id' | 'package-name' | 'service' | 'slot' | 'dependency'
   severity: 'error' | 'warning'
   candidate: string
   existing: string

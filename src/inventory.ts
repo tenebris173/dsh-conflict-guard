@@ -89,6 +89,9 @@ export function loadActiveEntries(profileDir: string): PluginEntry[] {
           prefixes: [],
           exact: [],
           services: [],
+          slots: [],
+          dynamicRoutes: [],
+          deps: {},
         })
       }
     }
@@ -112,6 +115,9 @@ export function loadActiveEntries(profileDir: string): PluginEntry[] {
           prefixes: [],
           exact: [],
           services: [],
+          slots: [],
+          dynamicRoutes: [],
+          deps: {},
         })
       } else if (e.name) {
         const pkgDir = resolvePackageDir(profileDir, e.name)
@@ -124,6 +130,9 @@ export function loadActiveEntries(profileDir: string): PluginEntry[] {
           prefixes: [],
           exact: [],
           services: [],
+          slots: [],
+          dynamicRoutes: [],
+          deps: {},
         })
       }
     }
@@ -140,6 +149,9 @@ export function loadActiveEntries(profileDir: string): PluginEntry[] {
       entry.prefixes = scan.prefixes
       entry.exact = scan.exact
       entry.services = scan.services
+      entry.slots = scan.slots || []
+      entry.dynamicRoutes = scan.dynamicRoutes || []
+      entry.deps = scan.deps || {}
     }
   }
   return entries
@@ -196,18 +208,21 @@ export function auditProfileStructure(profileDir: string): StructureIssue[] {
 
         // Official @deepseek-ai core bundles intentionally share/override ids
         // (e.g. dsh-base vs dsh-web-app). Only flag cross-bundle duplicates
-        // between non-official third-party bundles.
-        const owner = idOwners.get(e.id)
-        if (owner !== undefined && owner !== bundle && !isOfficialBundle(owner) && !isOfficialBundle(bundle)) {
-          if (!reportedCrossDuplicates.has(e.id)) {
-            reportedCrossDuplicates.add(e.id)
-            issues.push({
-              severity: 'error',
-              message: `loader id "${e.id}" is registered by both bundle "${owner}" and bundle "${bundle}"`,
-            })
+        // between non-official third-party bundles, and only when both sides
+        // are enabled.
+        if (!e.disabled) {
+          const owner = idOwners.get(e.id)
+          if (owner !== undefined && owner !== bundle && !isOfficialBundle(owner) && !isOfficialBundle(bundle)) {
+            if (!reportedCrossDuplicates.has(e.id)) {
+              reportedCrossDuplicates.add(e.id)
+              issues.push({
+                severity: 'error',
+                message: `loader id "${e.id}" is registered by both bundle "${owner}" and bundle "${bundle}"`,
+              })
+            }
+          } else if (owner === undefined) {
+            idOwners.set(e.id, bundle)
           }
-        } else if (owner === undefined) {
-          idOwners.set(e.id, bundle)
         }
       }
     }

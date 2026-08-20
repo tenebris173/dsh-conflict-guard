@@ -5,6 +5,7 @@
  * 服务名冲突检测；永久禁用始终由用户选择。
  */
 import { watch, existsSync } from 'node:fs'
+import { spawn } from 'node:child_process'
 import { join } from 'node:path'
 import type { Context } from 'cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
@@ -32,6 +33,14 @@ export function apply(ctx: Context, config: Config = {}): void {
     const active = loadActiveEntries(dir)
     const issues = auditProfileStructure(dir)
     const conflicts = findExistingConflicts(active)
+    for (const e of active) {
+      if (e.dynamicRoutes && e.dynamicRoutes.length > 0) {
+        issues.push({
+          severity: 'warning' as const,
+          message: `${e.id} uses dynamic route path(s): ${e.dynamicRoutes.join(', ')}`,
+        })
+      }
+    }
     return {
       updatedAt: Date.now(),
       profile: profileName(),
@@ -127,15 +136,18 @@ export function apply(ctx: Context, config: Config = {}): void {
       var d = document.createElement('div');
       d.textContent = '[' + (c.severity === 'error' ? '错误' : '警告') + '] ' + (c.detail || c.kind);
       item.appendChild(d);
-      if (c.existingId) {
+      var ids = [];
+      if (c.candidateId) ids.push(c.candidateId);
+      if (c.existingId && c.existingId !== c.candidateId) ids.push(c.existingId);
+      ids.forEach(function (id) {
         var btn = document.createElement('button');
-        btn.textContent = '永久禁用 ' + c.existingId;
-        btn.style.cssText = 'margin-top:8px;border:none;border-radius:8px;padding:8px 12px;background:#2563eb;color:#fff;cursor:pointer';
+        btn.textContent = '永久禁用 ' + id;
+        btn.style.cssText = 'margin-top:8px;margin-right:6px;border:none;border-radius:8px;padding:8px 12px;background:#2563eb;color:#fff;cursor:pointer';
         btn.onclick = function () {
           fetch('/dsh-conflict-guard/choose', {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ disableId: c.existingId })
+            body: JSON.stringify({ disableId: id })
           }).then(function () {
             dismissedSignature = report.signature;
             localStorage.setItem('dsh-conflict-guard-dismissed', report.signature);
@@ -143,7 +155,7 @@ export function apply(ctx: Context, config: Config = {}): void {
           });
         };
         item.appendChild(btn);
-      }
+      });
       card.appendChild(item);
     });
     var ok = document.createElement('button');
@@ -185,23 +197,23 @@ export function apply(ctx: Context, config: Config = {}): void {
   const dir = profileDir()
   ctx.effect(() => {
     const watchers: any[] = []
-    try {
-      const profileWatcher = watch(dir, (event, filename) => {
-        if (filename === 'package.json' || filename === 'cordis.patch.yml') scheduleScan()
-      })
-      watchers.push(profileWatcher)
-    } catch {
-      // profile dir may not exist yet
+    const watchRecursive = (target: string, handler: (event: string, filename: string | null) => void) => {
+      try {
+        return watch(target, { recursive: true }, handler)
+      } catch {
+        try { return watch(target, handler) } catch { return undefined }
+      }
     }
+
+    const profileWatcher = watchRecursive(dir, (event, filename) => {
+      if (filename === 'package.json' || filename === 'cordis.patch.yml') scheduleScan()
+    })
+    if (profileWatcher) watchers.push(profileWatcher)
 
     const nodeModules = join(dir, 'node_modules')
     if (existsSync(nodeModules)) {
-      try {
-        const nmWatcher = watch(nodeModules, () => scheduleScan())
-        watchers.push(nmWatcher)
-      } catch {
-        // ignore watch errors
-      }
+      const nmWatcher = watchRecursive(nodeModules, () => scheduleScan())
+      if (nmWatcher) watchers.push(nmWatcher)
     }
 
     return () => {
@@ -274,6 +286,63 @@ export function apply(ctx: Context, config: Config = {}): void {
       return language() === 'en' ? en : language() === 'zh' ? zh : `${zh}\n${en}`
     },
   })), '@dsh-external/dsh-conflict-guard: fix tool')
+
+  // 工具：可选启动冒烟测试（真实拉起一次 dsh web）。
+  ctx.effect(() => ctx.tools.register(defineTool({
+    name: 'dsh_conflict_guard_smoke',
+    description: 'Startup smoke test: spawn a temporary dsh web instance and verify it boots',
+    parameters: {
+      profile: { type: 'string', description: 'profile 名，默认自动检测' },
+      timeoutMs: { type: 'number', description: '超时毫秒，默认 60000' },
+    },
+    output: {
+      schema: { type: 'string' },
+      render: (_args: unknown, value: unknown) => [{ type: 'text', text: String(value) }],
+    },
+    async execute(args: { profile?: string; timeoutMs?: number }) {
+      const prof = args.profile || profileName()
+      const timeout = Math.min(Math.max(Number(args.timeoutMs) || 60000, 5000), 120000)
+      return await new Promise<string>((resolve) => {
+        const child = spawn('cmd.exe', ['/c', 'dsh', 'web', '--profile', prof, '--port', '0'], { windowsHide: true })
+        let out = ''
+        let done = false
+        const timer = setTimeout(() => {
+          if (!done) {
+            done = true
+            try { child.kill() } catch { /* ignore */ }
+            resolve(`❌ smoke test timeout after ${timeout}ms`)
+          }
+        }, timeout)
+        child.stdout.on('data', (d) => {
+          out += d.toString()
+          const m = out.match(/dsh web: http:\/\/\S+/)
+          if (m) {
+            if (!done) {
+              done = true
+              clearTimeout(timer)
+              try { child.kill() } catch { /* ignore */ }
+              resolve(`✅ smoke test OK: ${m[0]}`)
+            }
+          }
+        })
+        child.stderr.on('data', (d) => { out += d.toString() })
+        child.on('exit', (code) => {
+          if (!done) {
+            done = true
+            clearTimeout(timer)
+            resolve(`❌ smoke test exited code ${code}: ${out.slice(-500)}`)
+          }
+        })
+        child.on('error', (err) => {
+          if (!done) {
+            done = true
+            clearTimeout(timer)
+            resolve(`❌ smoke test error: ${err.message}`)
+          }
+        })
+      })
+    },
+  })), '@dsh-external/dsh-conflict-guard: smoke tool')
 }
 
 /** Deterministic short hash of a JSON value, used as a conflict signature. */
@@ -284,5 +353,4 @@ function fingerprint(value: unknown): string {
     h = ((h << 5) + h + json.charCodeAt(i)) >>> 0
   }
   return h.toString(36)
-}
 }
