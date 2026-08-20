@@ -22,9 +22,10 @@ export interface Config {
 }
 
 export function apply(ctx: Context, config: Config = {}): void {
-  const profileName = () => detectProfileName(config.profile)
+  const cfg = config ?? {}
+  const profileName = () => detectProfileName(cfg.profile)
   const profileDir = () => resolveProfileDir(profileName())
-  const language = () => config.language ?? 'both'
+  const language = () => cfg.language ?? 'both'
 
   const buildReport = () => {
     const dir = profileDir()
@@ -86,7 +87,12 @@ export function apply(ctx: Context, config: Config = {}): void {
       } catch {
         // ignore malformed body
       }
-      const id = typeof data.disableId === 'string' ? data.disableId : ''
+      const id = typeof data.disableId === 'string' ? data.disableId.trim() : ''
+      if (!id) {
+        res.writeHead(400, { 'content-type': 'application/json; charset=utf-8' })
+        res.end(JSON.stringify({ ok: false, message: 'disableId is required' }))
+        return
+      }
       const result = disablePlugin(profileDir(), id)
       res.writeHead(result.ok ? 200 : 400, { 'content-type': 'application/json; charset=utf-8' })
       res.end(JSON.stringify(result))
