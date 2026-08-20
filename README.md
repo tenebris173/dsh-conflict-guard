@@ -89,17 +89,17 @@ Example flow:
 
 ## Background & Credits / 背景与致谢
 
-This plugin was born from a real user problem:
+This plugin exists because a real user hit a real wall.
 
-- The user installed the floating desktop pet `dsh-pet` while the family bundle's pet plugin was also active. Both registered the `/pet` route, and DSH crashed at startup with a duplicate route error.
-- The user realized plugin conflict detection is a common need, proposed the "security gate" (安检门) concept, and commissioned this development.
-- The user is not a developer. The requirement, acceptance testing, and final decisions were driven by the user; the implementation was done by an AI assistant.
+The user does not know how to code at all. They installed a floating desktop pet, DSH crashed because two pets both claimed `/pet`, and they had to be rescued twice. Instead of giving up, they turned the pain into a product idea: a "security gate" for plugin installation. They explained the need in plain language, tested every version, and made the final calls. I (an AI assistant) did the actual coding.
 
-这个插件来自一个真实用户问题：
+So this project is a collaboration between a non-developer with a clear need and an AI that can write code. We're both a little proud of that.
 
-- 用户安装了浮动桌宠 `dsh-pet`，与全家桶自带宠物同时注册 `/pet` 路由，导致 DSH 启动崩溃。
-- 用户意识到“插件冲突检测”是普遍需求，提出了“安检门”概念并委托开发。
-- 用户本人不会开发；需求提出、验收和最终把关由用户完成，代码实现由 AI 助手完成。
+这个插件来自一个真实用户踩到的真实坑。
+
+用户完全不会开发。他安装了浮动桌宠后，DSH 因为两个宠物都抢 `/pet` 路由而崩溃，还被人救过两次。但他没有放弃，而是把这次痛苦变成了一个产品想法：给插件安装加一道“安检门”。他用大白话说清需求、逐个版本验收、拍板最终方案；代码部分由我（AI 助手）完成。
+
+所以这个项目是“不懂开发但有真实需求的人 + 会写代码的 AI”的合作成果。我们俩都有点自豪。
 
 ## License / 许可
 
