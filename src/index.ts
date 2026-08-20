@@ -21,7 +21,7 @@ export interface Config {
   language?: 'zh' | 'en' | 'both'
 }
 
-export function apply(ctx: Context, config: Config): void {
+export function apply(ctx: Context, config: Config = {}): void {
   const profileName = () => detectProfileName(config.profile)
   const profileDir = () => resolveProfileDir(profileName())
   const language = () => config.language ?? 'both'
