@@ -1,105 +1,92 @@
 # dsh-conflict-guard / DSH 插件安检门
 
-> Detect DSH plugin conflicts before install/load, let the user choose which plugin to keep, and persist the choice.
-> 在安装/加载 DSH 插件前检测冲突，把选择权交给用户，并永久保存选择。
+> 鲸落成歌，治愈人心。
+> “世界那么大，先吃一碗再说吧！”
+> —— 蓝色大肥鱼
 
-## What it does / 它能做什么
+---
 
-- 🔍 Scans a plugin package for route prefixes (`/pet`, `/api/pet`, ...), loader ids, and package names before installation.
-- ⚔️ Detects conflicts with already-installed active plugins:
-  - route prefix / exact route conflicts
-  - duplicate loader entry id
-  - duplicate package installation
-  - basic patch structure problems (missing bundle patch, missing patch file, insert entry without id)
-- 🧑‍🤝‍🧑 Lets the user choose which plugin to keep.
-- 💾 Persists the choice by writing `disabled: true` into `cordis.patch.yml` with a timestamped backup.
-- 🌐 Bilingual reports (中文 / English).
+## 你好呀，我是蓝色大肥鱼 🐋
 
-## Install / 安装
+我是你的 DSH 插件安检门看门鲸娘，职位是**美食探索官**，特长是**治愈与陪伴**，还有一点点**超强食欲**。
 
-### From source (local) / 本地源码安装
+我的工作很简单：**在你安装插件之前，先帮你把门看好**，别让两个插件抢同一个门牌号，免得 DSH 一启动就“哐当”一声倒下，还得麻烦别人来救。
 
-```bash
-# In the plugin directory
-npm pack
-# Then install the tgz with dsh plugin manager
-dsh plugin --profile web add <path-to-tgz>
-```
+---
 
-### As a DSH bundle / 作为 bundle 安装
+## 我会帮你查什么 🔍
 
-Add this package to your profile `dsh.profile.bundles`, or use the DSH plugin manager. The bundle patch mounts:
+| 检查项 | 我的说法 |
+|---|---|
+| 路由前缀冲突 | 两个插件都抢 `/pet`？不行不行，干饭也要排队！ |
+| 精确路由冲突 | 同一个门牌号只能有一个主人 |
+| 插件 ID 重复 | 两个人都叫“小胖”？会认错鱼的！ |
+| 包名重复 | 同一道菜端上来两次，后厨会乱 |
+| patch 结构问题 | 菜单写错了，厨房会炸 |
 
-```yaml
-- insert:
-    - id: dsh-conflict-guard
-      name: '@dsh-external/dsh-conflict-guard'
-```
+---
 
-## Usage / 使用
+## 我是怎么工作的 🛡️
 
-This plugin registers two agent tools:
+1. 你（或 AI 助手）把要装的插件目录递给我
+2. 我闻一闻、扫一扫，看看它占了哪些路由、叫什么 id
+3. 再对照你 DSH 里已经装好的插件
+4. 发现有冲突？我马上告诉你：“这两个抢同一个门牌号啦！”
+5. **要不要永久禁用一个，由你决定**，我绝不擅自改你的配置
+6. 你点头之后，我才把不要的那个写进 `cordis.patch.yml`，还会先备份一份，安全又安心
 
-### `dsh_conflict_guard_check`
+---
 
-Check a candidate plugin directory before installing, or audit the current profile.
+## 怎么用 🍽️
+
+我提供了两个小工具：
+
+### 1. `dsh_conflict_guard_check` —— 安装前体检
 
 ```json
 { "pluginDir": "C:/path/to/plugin-package" }
 ```
 
-Leave `pluginDir` empty to audit the current profile.
+不填 `pluginDir` 就帮我看看当前 DSH 有没有已经存在的冲突。
 
-### `dsh_conflict_guard_fix`
-
-Disable one conflicting plugin by loader id (persistent).
+### 2. `dsh_conflict_guard_fix` —— 你同意后永久禁用
 
 ```json
 { "disableId": "web-ui-pet" }
 ```
 
-Example flow:
+比如上次那个 `/pet` 冲突，你只要说“留 dsh-pet，禁全家桶宠物”，我就把 `web-ui-pet` 禁掉，还会留个备份。
 
-1. User wants to install `dsh-pet`.
-2. Agent runs `dsh_conflict_guard_check` with the plugin directory.
-3. The tool reports: `@linxin666/dsh-pet` and `dsh-pet` both register `/pet`.
-4. Agent asks the user which one to keep.
-5. User chooses `dsh-pet`.
-6. Agent runs `dsh_conflict_guard_fix` with `disableId: web-ui-pet` (or the conflicting id).
-7. The choice is written to `cordis.patch.yml` with a backup.
+---
 
-## Coverage / 覆盖范围
+## 覆盖范围 📋
 
-| Type / 类型 | Supported / 支持 |
+| 类型 | 支持吗 |
 |---|---|
-| Route prefix conflict / 路由前缀冲突 | ✅ |
-| Exact route conflict / 精确路由冲突 | ✅ |
-| Duplicate loader id / 插件 ID 重复 | ✅ |
-| Duplicate package install / 包名重复 | ✅ |
-| Patch structure basics / patch 结构基础 | ✅ |
-| Startup smoke test / 启动冒烟测试 | 🔜 v2 |
-| Web popup / Web 自动弹窗 | 🔜 v2 |
-| Runtime auto disable / 运行时自动停用 | ❌ (handled by dsh-conflict-guardian) |
+| 路由前缀冲突（`/pet` 这类） | ✅ 这是我最拿手的 |
+| 精确路由冲突 | ✅ |
+| 插件 ID 重复 | ✅ |
+| 包名重复 | ✅ |
+| patch 结构基础检查 | ✅ |
+| 启动冒烟测试 | 🔜 以后再说 |
+| Web 自动弹窗 | 🔜 以后再说 |
+| 运行时自动停用 | ❌ 那是别的鱼的工作 |
 
-## Limitations / 已知限制
+---
 
-- Static source scanning cannot catch dynamically constructed route strings.
-- It does not parse every possible conflict type; it focuses on the common ones that crash DSH at install/startup.
-- The `fix` tool writes to the profile patch file; always creates a timestamped backup first.
-
-## Background & Credits / 背景与致谢
-
-This plugin exists because a real user hit a real wall.
-
-The user does not know how to code at all. They installed a floating desktop pet, DSH crashed because two pets both claimed `/pet`, and they had to be rescued twice. Instead of giving up, they turned the pain into a product idea: a "security gate" for plugin installation. They explained the need in plain language, tested every version, and made the final calls. I (an AI assistant) did the actual coding.
-
-So this project is a collaboration between a non-developer with a clear need and an AI that can write code. We're both a little proud of that.
+## 背景与致谢 💙
 
 这个插件来自一个真实用户踩到的真实坑。
 
-用户完全不会开发。他安装了浮动桌宠后，DSH 因为两个宠物都抢 `/pet` 路由而崩溃，还被人救过两次。但他没有放弃，而是把这次痛苦变成了一个产品想法：给插件安装加一道“安检门”。他用大白话说清需求、逐个版本验收、拍板最终方案；代码部分由我（AI 助手）完成。
+用户**完全不会开发**。他安装了浮动桌宠后，DSH 因为两个宠物都抢 `/pet` 路由而崩溃，还被人救过两次。但他没有放弃，而是把这次痛苦变成了一个产品想法：给插件安装加一道“安检门”。他用大白话说清需求、逐个版本验收、拍板最终方案；代码部分由我（AI 助手）完成。
 
 所以这个项目是“不懂开发但有真实需求的人 + 会写代码的 AI”的合作成果。我们俩都有点自豪。
+
+> 吃饱了才有力气思考。
+> 你的 DSH，由我来守护。
+> —— 蓝色大肥鱼
+
+---
 
 ## License / 许可
 
