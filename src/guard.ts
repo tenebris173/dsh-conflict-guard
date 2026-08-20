@@ -358,7 +358,9 @@ export function formatIssues(issues: { severity: 'error' | 'warning'; message: s
   if (language !== 'zh') lines.push(`Detected ${issues.length} profile structure issue(s):`)
 
   issues.forEach((issue, i) => {
-    const sev = issue.severity === 'error' ? (language === 'en' ? 'ERROR' : '错误') : (language === 'en' ? 'WARNING' : '警告')
+    const sev = issue.severity === 'error'
+      ? (language === 'en' ? 'ERROR' : language === 'zh' ? '错误' : '错误/ERROR')
+      : (language === 'en' ? 'WARNING' : language === 'zh' ? '警告' : '警告/WARNING')
     lines.push(`${i + 1}. [${sev}] ${issue.message}`)
   })
 
