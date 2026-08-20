@@ -1,0 +1,5 @@
+# dsh-conflict-guard bundle patch
+# Mounts the conflict guard into the DSH web profile.
+- insert:
+    - id: dsh-conflict-guard
+      name: '@dsh-external/dsh-conflict-guard'
