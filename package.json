@@ -1,9 +1,18 @@
 {
   "name": "@dsh-external/dsh-conflict-guard",
-  "version": "0.0.1",
-  "description": "DSH plugin conflict guard: detect route prefix / plugin id / patch structure conflicts before install/load, let user choose which to keep, and persist the choice.",
+  "version": "0.2.0",
+  "description": "DSH plugin conflict guard: detect route prefix / plugin id / service / patch structure conflicts before install/load, let user choose which to keep, and persist the choice.",
   "type": "module",
   "main": "./lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
   "files": [
     "lib",
     "cordis.patch.yml",
@@ -14,6 +23,13 @@
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
+      "platform": "web"
     }
   },
   "peerDependencies": {

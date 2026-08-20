@@ -76,6 +76,7 @@ export function loadActiveEntries(profileDir: string): PluginEntry[] {
           disabled: e.disabled,
           prefixes: [],
           exact: [],
+          services: [],
         })
       }
     }
@@ -98,6 +99,7 @@ export function loadActiveEntries(profileDir: string): PluginEntry[] {
           disabled: true,
           prefixes: [],
           exact: [],
+          services: [],
         })
       } else if (e.name) {
         const pkgDir = resolvePackageDir(profileDir, e.name)
@@ -109,6 +111,7 @@ export function loadActiveEntries(profileDir: string): PluginEntry[] {
           disabled: false,
           prefixes: [],
           exact: [],
+          services: [],
         })
       }
     }
@@ -121,6 +124,7 @@ export function loadActiveEntries(profileDir: string): PluginEntry[] {
       const scan = scanPackage(entry.packageDir)
       entry.prefixes = scan.prefixes
       entry.exact = scan.exact
+      entry.services = scan.services
     }
   }
   return entries
@@ -164,14 +168,32 @@ export function auditProfileStructure(profileDir: string): StructureIssue[] {
 
     const text = readFileSync(patchPath, 'utf8')
     const entries = parsePatchEntries(text, bundle)
+    const seen = new Map<string, number>()
     for (const e of entries) {
       if (!e.id) issues.push({ severity: 'error', message: `bundle "${bundle}" has an insert entry without id` })
+      else {
+        const count = (seen.get(e.id) || 0) + 1
+        seen.set(e.id, count)
+        if (count > 1) issues.push({ severity: 'error', message: `bundle "${bundle}" has duplicate id "${e.id}"` })
+      }
     }
   }
 
   const profilePatchPath = join(profileDir, 'cordis.patch.yml')
   if (!existsSync(profilePatchPath)) {
     issues.push({ severity: 'warning', message: `profile patch file missing: ${profilePatchPath}` })
+  } else {
+    const text = readFileSync(profilePatchPath, 'utf8')
+    const entries = parsePatchEntries(text, '')
+    const seen = new Map<string, number>()
+    for (const e of entries) {
+      if (!e.id) issues.push({ severity: 'error', message: `profile patch has an insert entry without id` })
+      else {
+        const count = (seen.get(e.id) || 0) + 1
+        seen.set(e.id, count)
+        if (count > 1) issues.push({ severity: 'error', message: `profile patch has duplicate id "${e.id}"` })
+      }
+    }
   }
 
   return issues

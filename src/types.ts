@@ -6,6 +6,7 @@ export interface PluginEntry {
   disabled: boolean
   prefixes: string[]
   exact: string[]
+  services: string[]
 }
 
 export interface RouteScan {
@@ -14,10 +15,11 @@ export interface RouteScan {
   prefixes: string[]
   exact: string[]
   ids: string[]
+  services: string[]
 }
 
 export interface Conflict {
-  kind: 'route-prefix' | 'route-exact' | 'plugin-id' | 'package-name'
+  kind: 'route-prefix' | 'route-exact' | 'plugin-id' | 'package-name' | 'service'
   severity: 'error' | 'warning'
   candidate: string
   existing: string

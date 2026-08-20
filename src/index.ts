@@ -1,9 +1,11 @@
 /**
  * @dsh-external/dsh-conflict-guard — DSH 插件冲突检测与自动禁用（安检门）。
  *
- * 目标：在安装/加载插件前发现会破坏稳定性的冲突（路由前缀、插件 ID、
- * patch 结构等），并把选择权交给用户；同时提供启动/审计模式扫描已有冲突。
+ * V2：在安装前检测基础上，增加 Web 自动弹窗、文件监听、启动保护和
+ * 服务名冲突检测；永久禁用始终由用户选择。
  */
+import { watch, existsSync } from 'node:fs'
+import { join } from 'node:path'
 import type { Context } from 'cordis'
 import { defineTool } from '@deepseek-ai/dsh-tools'
 import { scanPackage } from './scanner.js'
@@ -12,7 +14,7 @@ import { findConflicts, findExistingConflicts, formatConflicts, formatIssues } f
 import { disablePlugin } from './patch.js'
 
 export const name = '@dsh-external/dsh-conflict-guard'
-export const inject = ['tools']
+export const inject = ['tools', 'webServer']
 
 export interface Config {
   profile?: string
@@ -24,7 +26,117 @@ export function apply(ctx: Context, config: Config): void {
   const profileDir = () => resolveProfileDir(profileName())
   const language = () => config.language ?? 'both'
 
-  // 检查：给定待装插件目录，或扫描当前 profile 已有冲突。
+  const buildReport = () => {
+    const dir = profileDir()
+    const active = loadActiveEntries(dir)
+    const issues = auditProfileStructure(dir)
+    const conflicts = findExistingConflicts(active)
+    return {
+      updatedAt: Date.now(),
+      profile: profileName(),
+      conflicts,
+      issues,
+    }
+  }
+
+  // 启动保护：拦截重复路由注册，避免 DSH 因插件冲突直接崩溃。
+  if (ctx.webServer) {
+    const originalRegister = ctx.webServer.register.bind(ctx.webServer)
+    ctx.effect(() => {
+      ctx.webServer.register = (route: any) => {
+        const table = route.kind === 'exact' ? ctx.webServer.exact : ctx.webServer.prefixes
+        if (table.has(route.path)) {
+          ctx.logger?.warn?.(`[dsh-conflict-guard] blocked duplicate ${route.kind} route "${route.path}"`)
+          return () => {}
+        }
+        return originalRegister(route)
+      }
+      return () => {
+        ctx.webServer.register = originalRegister
+      }
+    }, 'dsh-conflict-guard: route guard')
+  }
+
+  // 报告接口：给浏览器端弹窗轮询。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: '/dsh-conflict-guard/report',
+    handler: async (_req: any, res: any) => {
+      try {
+        const report = buildReport()
+        res.writeHead(200, { 'content-type': 'application/json; charset=utf-8' })
+        res.end(JSON.stringify(report))
+      } catch (error: any) {
+        res.writeHead(500, { 'content-type': 'application/json; charset=utf-8' })
+        res.end(JSON.stringify({ error: String(error?.message ?? error) }))
+      }
+    },
+  }), 'dsh-conflict-guard: report route')
+
+  // 选择接口：用户从弹窗里决定永久禁用哪个。
+  ctx.effect(() => ctx.webServer.register({
+    kind: 'exact',
+    path: '/dsh-conflict-guard/choose',
+    handler: async (req: any, res: any) => {
+      let body = ''
+      for await (const chunk of req) body += chunk
+      let data: any = {}
+      try {
+        data = JSON.parse(body || '{}')
+      } catch {
+        // ignore malformed body
+      }
+      const id = typeof data.disableId === 'string' ? data.disableId : ''
+      const result = disablePlugin(profileDir(), id)
+      res.writeHead(result.ok ? 200 : 400, { 'content-type': 'application/json; charset=utf-8' })
+      res.end(JSON.stringify(result))
+    },
+  }), 'dsh-conflict-guard: choose route')
+
+  // 文件监听：市场/手动/命令行安装都能触发重新扫描。
+  let scanTimer: any
+  const scheduleScan = () => {
+    clearTimeout(scanTimer)
+    scanTimer = setTimeout(() => {
+      try {
+        buildReport()
+      } catch (error: any) {
+        ctx.logger?.warn?.(`[dsh-conflict-guard] scan failed: ${String(error?.message ?? error)}`)
+      }
+    }, 1200)
+  }
+
+  const dir = profileDir()
+  ctx.effect(() => {
+    const watchers: any[] = []
+    try {
+      const profileWatcher = watch(dir, (event, filename) => {
+        if (filename === 'package.json' || filename === 'cordis.patch.yml') scheduleScan()
+      })
+      watchers.push(profileWatcher)
+    } catch {
+      // profile dir may not exist yet
+    }
+
+    const nodeModules = join(dir, 'node_modules')
+    if (existsSync(nodeModules)) {
+      try {
+        const nmWatcher = watch(nodeModules, () => scheduleScan())
+        watchers.push(nmWatcher)
+      } catch {
+        // ignore watch errors
+      }
+    }
+
+    return () => {
+      for (const w of watchers) {
+        try { w.close() } catch { /* ignore */ }
+      }
+      clearTimeout(scanTimer)
+    }
+  }, 'dsh-conflict-guard: file watcher')
+
+  // 工具：安装前检查。
   ctx.effect(() => ctx.tools.register(defineTool({
     name: 'dsh_conflict_guard_check',
     description: 'Check DSH plugin conflicts before install or audit current profile',
@@ -61,7 +173,7 @@ export function apply(ctx: Context, config: Config): void {
     },
   })), '@dsh-external/dsh-conflict-guard: check tool')
 
-  // 修复：把用户选择不要的插件写成 disabled。
+  // 工具：用户同意后永久禁用。
   ctx.effect(() => ctx.tools.register(defineTool({
     name: 'dsh_conflict_guard_fix',
     description: 'Disable one conflicting DSH plugin by loader id in cordis.patch.yml',

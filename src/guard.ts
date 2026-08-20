@@ -59,6 +59,20 @@ export function findConflicts(candidate: RouteScan, active: PluginEntry[]): Conf
         })
       }
     }
+
+    for (const cs of candidate.services ?? []) {
+      if ((entry.services ?? []).includes(cs)) {
+        conflicts.push({
+          kind: 'service',
+          severity: 'error',
+          candidate: candidate.packageName,
+          existing: `${entry.id} (${entry.packageName})`,
+          detail: `Both plugins provide service "${cs}"`,
+          candidateId: candidate.ids[0],
+          existingId: entry.id,
+        })
+      }
+    }
   }
 
   const existingPackages = new Set(active.filter((e) => !e.disabled).map((e) => e.packageName).filter(Boolean))
@@ -130,6 +144,20 @@ export function findExistingConflicts(entries: PluginEntry[]): Conflict[] {
             candidateId: a.id,
             existingId: b.id,
             route: ae,
+          })
+        }
+      }
+
+      for (const as of a.services ?? []) {
+        if ((b.services ?? []).includes(as)) {
+          conflicts.push({
+            kind: 'service',
+            severity: 'error',
+            candidate: a.packageName,
+            existing: `${b.id} (${b.packageName})`,
+            detail: `Both plugins provide service "${as}"`,
+            candidateId: a.id,
+            existingId: b.id,
           })
         }
       }
@@ -208,6 +236,7 @@ function kindLabelZh(kind: Conflict['kind']): string {
     case 'route-exact': return '精确路由冲突'
     case 'plugin-id': return '插件 ID 冲突'
     case 'package-name': return '包名重复'
+    case 'service': return '服务名冲突'
   }
 }
 
@@ -217,5 +246,6 @@ function kindLabelEn(kind: Conflict['kind']): string {
     case 'route-exact': return 'exact route conflict'
     case 'plugin-id': return 'plugin id conflict'
     case 'package-name': return 'duplicate package name'
+    case 'service': return 'service name conflict'
   }
 }

@@ -89,6 +89,21 @@ export function extractRoutesFromFile(file: string): { prefixes: string[]; exact
   }
 }
 
+export function extractServicesFromFile(file: string): string[] {
+  const src = readFileSync(file, 'utf8')
+  const code = src.split(/\r?\n/).filter((line) => {
+    const t = line.trim()
+    return !(t.startsWith('//') || t.startsWith('/*') || t.startsWith('*'))
+  }).join('\n')
+  const services = new Set<string>()
+  const re = /(?:ctx\.provide|provide)\s*\(\s*['"]([^'"]+)['"]\s*\)/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(code)) !== null) services.add(m[1])
+  const constRe = /(?:export\s+)?const\s+(?:provide|service)\s*=\s*['"]([^'"]+)['"]/g
+  while ((m = constRe.exec(code)) !== null) services.add(m[1])
+  return [...services].sort()
+}
+
 /** Scan a plugin package directory for route declarations and patch ids. */
 export function scanPackage(packageDir: string): RouteScan {
   const pkgJsonPath = join(packageDir, 'package.json')
@@ -97,6 +112,7 @@ export function scanPackage(packageDir: string): RouteScan {
 
   const prefixes = new Set<string>()
   const exact = new Set<string>()
+  const services = new Set<string>()
   const files: string[] = []
   for (const sub of ['lib', 'src']) {
     const dir = join(packageDir, sub)
@@ -110,6 +126,7 @@ export function scanPackage(packageDir: string): RouteScan {
     const r = extractRoutesFromFile(file)
     for (const p of r.prefixes) prefixes.add(p)
     for (const p of r.exact) exact.add(p)
+    for (const s of extractServicesFromFile(file)) services.add(s)
   }
 
   const ids = new Set<string>()
@@ -131,5 +148,6 @@ export function scanPackage(packageDir: string): RouteScan {
     prefixes: [...prefixes].sort(),
     exact: [...exact].sort(),
     ids: [...ids].sort(),
+    services: [...services].sort(),
   }
 }
