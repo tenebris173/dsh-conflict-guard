@@ -61,11 +61,10 @@ export function extractRoutesFromFile(file: string): { prefixes: string[]; exact
     assignments.set(m[1], m[2])
   }
 
-  // Split `register({ ... })` calls into balanced object blocks, then look for
-  // `kind:` and `path:` inside the SAME block. A blanket regex over the whole
-  // file would pair a `kind:` from one object with a `path:` from an unrelated
-  // later object and fabricate route registrations.
-  for (const block of collectRegisterBlocks(code)) {
+  // Split object literals into balanced blocks, then look for `kind:` and
+  // `path:` inside the SAME block. This catches both inline `register({...})`
+  // and route objects registered indirectly (e.g. `routes.map(r => register(r))`).
+  for (const block of collectObjectBlocks(code)) {
     const kindMatch = block.match(/kind:\s*['"](prefix|exact)['"]/)
     const pathMatch = block.match(/path:\s*([A-Za-z_$][\w$]*|['"`][^'"`]+['"`])/)
     if (!kindMatch || !pathMatch) continue
@@ -97,16 +96,16 @@ export function extractRoutesFromFile(file: string): { prefixes: string[]; exact
 }
 
 /**
- * Collect the balanced object-literal argument of each `register({ ... })`
- * call in a source file. The returned blocks are self-contained, so kind/path
- * pairs cannot be assembled across unrelated objects.
+ * Collect every balanced object-literal block in a source file. Each block is
+ * self-contained, so kind/path pairs cannot be assembled across unrelated
+ * objects.
  */
-function collectRegisterBlocks(code: string): string[] {
+function collectObjectBlocks(code: string): string[] {
   const blocks: string[] = []
-  const re = /(?:\.register|register)\s*\(\s*\{/g
+  const re = /\{/g
   let m: RegExpExecArray | null
   while ((m = re.exec(code)) !== null) {
-    const start = m.index + m[0].length - 1 // index of the opening '{'
+    const start = m.index
     let depth = 1
     let i = start + 1
     let quote: string | null = null

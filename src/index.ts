@@ -262,9 +262,17 @@ export function apply(ctx: Context, config: Config = {}): void {
       const parts: string[] = []
       if (args.pluginDir) {
         const candidate = scanPackage(args.pluginDir)
+        if (candidate.dynamicRoutes && candidate.dynamicRoutes.length > 0) {
+          issues.push({ severity: 'warning', message: `candidate uses dynamic route path(s): ${candidate.dynamicRoutes.join(', ')}` })
+        }
         const conflicts = findConflicts(candidate, active)
         parts.push(formatConflicts(conflicts, language()))
       } else {
+        for (const e of active) {
+          if (e.dynamicRoutes && e.dynamicRoutes.length > 0) {
+            issues.push({ severity: 'warning', message: `${e.id} uses dynamic route path(s): ${e.dynamicRoutes.join(', ')}` })
+          }
+        }
         const conflicts = findExistingConflicts(active)
         parts.push(formatConflicts(conflicts, language()))
       }

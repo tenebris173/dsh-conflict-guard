@@ -1,6 +1,6 @@
 {
   "name": "@dsh-external/dsh-conflict-guard",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "DSH plugin conflict guard: detect route prefix / plugin id / service / patch structure conflicts before install/load, let user choose which to keep, and persist the choice.",
   "type": "module",
   "main": "./lib/index.js",
