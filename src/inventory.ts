@@ -160,6 +160,8 @@ export function auditProfileStructure(profileDir: string): StructureIssue[] {
 
   const manifest = readJson(manifestPath)
   const bundles: string[] = manifest?.dsh?.profile?.bundles ?? []
+  const idOwners = new Map<string, string>()
+  const reportedCrossDuplicates = new Set<string>()
 
   for (const bundle of bundles) {
     const pkgDir = resolvePackageDir(profileDir, bundle)
@@ -191,6 +193,22 @@ export function auditProfileStructure(profileDir: string): StructureIssue[] {
         const count = (seen.get(e.id) || 0) + 1
         seen.set(e.id, count)
         if (count > 1) issues.push({ severity: 'error', message: `bundle "${bundle}" has duplicate id "${e.id}"` })
+
+        // Official @deepseek-ai core bundles intentionally share/override ids
+        // (e.g. dsh-base vs dsh-web-app). Only flag cross-bundle duplicates
+        // between non-official third-party bundles.
+        const owner = idOwners.get(e.id)
+        if (owner !== undefined && owner !== bundle && !isOfficialBundle(owner) && !isOfficialBundle(bundle)) {
+          if (!reportedCrossDuplicates.has(e.id)) {
+            reportedCrossDuplicates.add(e.id)
+            issues.push({
+              severity: 'error',
+              message: `loader id "${e.id}" is registered by both bundle "${owner}" and bundle "${bundle}"`,
+            })
+          }
+        } else if (owner === undefined) {
+          idOwners.set(e.id, bundle)
+        }
       }
     }
   }
@@ -213,4 +231,8 @@ export function auditProfileStructure(profileDir: string): StructureIssue[] {
   }
 
   return issues
+}
+
+function isOfficialBundle(name: string): boolean {
+  return name.startsWith('@deepseek-ai/')
 }

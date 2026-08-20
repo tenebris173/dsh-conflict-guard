@@ -165,7 +165,9 @@ export function apply(ctx: Context, config: Config = {}): void {
   poll();
 })();
 </script>`
-  ctx.effect(() => ctx.webServer.tapIndex((html) => html.replace('</head>', popupScript + '</head>')), 'dsh-conflict-guard: popup script')
+  if (typeof ctx.webServer.tapIndex === 'function') {
+    ctx.effect(() => ctx.webServer.tapIndex((html) => html.replace('</head>', popupScript + '</head>')), 'dsh-conflict-guard: popup script')
+  }
 
   // 文件监听：市场/手动/命令行安装都能触发重新扫描。
   let scanTimer: any
